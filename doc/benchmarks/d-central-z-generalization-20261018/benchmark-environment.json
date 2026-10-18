@@ -1,0 +1,30 @@
+{
+  "Started": "2026-10-18T13:04:53.2188091+08:00",
+  "BaselineCommit": "45683819",
+  "Compiler": "g++.exe (MinGW-W64 x86_64-ucrt-posix-seh, built by Brecht Sanders, r8) 13.2.0",
+  "CPU": {
+    "Name": "AMD Ryzen 9 9950X3D 16-Core Processor          ",
+    "NumberOfLogicalProcessors": 32
+  },
+  "OS": {
+    "Caption": "Microsoft Windows 11 专业版",
+    "Version": "10.0.26100"
+  },
+  "Threads": 32,
+  "WarmupsPerConfiguration": 1,
+  "MeasuredRunsPerConfiguration": 5,
+  "Ordering": "Seeded randomized complete blocks; seed 1462026",
+  "OpenMP": [],
+  "Binaries": [
+    {
+      "Algorithm": "SHA256",
+      "Hash": "34F587CB27486C40D0726B0A6D757241F172405E43B8CA8707A88AFB663265FC",
+      "Path": "E:\\Code\\primecount\\build-agents-pr146-review-20261018\\original-build\\primecount.exe"
+    },
+    {
+      "Algorithm": "SHA256",
+      "Hash": "3A1BE14CCFA0921317D76838BA5D524FB515ED832A620A70CB8AF3B88AAFD744",
+      "Path": "E:\\Code\\primecount\\build-agents-pr146-review-20261018\\generalized-build\\primecount.exe"
+    }
+  ]
+}
