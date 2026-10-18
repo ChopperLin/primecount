@@ -24,6 +24,8 @@
 /// file in the top level directory.
 ///
 
+#include "S2Central.hpp"
+
 #include <primecount-internal.hpp>
 #include <macros.hpp>
 #include <PiTable.hpp>
@@ -56,6 +58,7 @@ T S2_hard_thread(T x,
                  const Primes& primes,
                  const PiTable& pi,
                  const FactorTable& factor,
+                 const Vector<S2CentralRow>& central,
                  ThreadData& thread)
 {
   T sum = 0;
@@ -76,6 +79,9 @@ T S2_hard_thread(T x,
 
   Vector<int64_t> phi = phi_vector(low, max_b, primes, pi);
   Sieve sieve(low, segment_size, max_b);
+  Vector<CentralEvent> events;
+  SemiprimeEventBitmap sorter;
+  auto count_sieve = [&sieve](uint64_t stop) { return sieve.count(stop); };
   thread.init_time = get_time();
 
   // Segmented sieve of Eratosthenes
@@ -105,6 +111,15 @@ T S2_hard_thread(T x,
 
       if (prime >= max_m)
         goto next_segment;
+
+      if (central[b].middle && low < y)
+      {
+        const S2CentralRow& row = central[b];
+        sum += central_y_segment(xp, prime, b, row.lower, row.middle,
+                                 row.mertens, low, high, phi[b], primes,
+                                 pi, count_sieve, events, sorter);
+        max_m = min(max_m, row.lower);
+      }
 
       min_m = factor.to_index(min_m);
       max_m = factor.to_index(max_m);
@@ -195,6 +210,15 @@ T S2_hard_OpenMP(T x,
   int max_threads = (int) std::pow(z, 1 / 3.7);
   threads = std::min(threads, max_threads);
   threads = ideal_num_threads(z, threads, thread_threshold);
+  auto central = s2_central_rows(x, y, c, primes, pi);
+  if (is_print)
+  {
+    int64_t rows = 0;
+    for (const S2CentralRow& row : central)
+      rows += (row.middle != 0);
+    print("Central band rows", rows);
+    print("S2_hard pi table limit", pi.size() - 1);
+  }
   INDETERMINATE LoadBalancerS2 loadBalancer(x, y, z, threads, is_print);
   T sum = 0;
 
@@ -205,7 +229,7 @@ T S2_hard_OpenMP(T x,
     while (loadBalancer.get_work(thread))
     {
       thread.start_time = get_time();
-      thread.sum = S2_hard_thread(x, y, z, c, primes, pi, factor, thread);
+      thread.sum = S2_hard_thread(x, y, z, c, primes, pi, factor, central, thread);
       thread.stop_time = get_time();
       sum += thread.sum;
     }
@@ -236,7 +260,7 @@ int64_t S2_hard(int64_t x,
   }
 
   FactorTable<uint16_t> factor(y, threads);
-  int64_t max_prime = min(y, z / isqrt(y));
+  int64_t max_prime = s2_central_max_prime(x, y, z);
   PiTable pi(max_prime, threads);
   auto primes = pi.get_primes<uint32_t>(max_prime, threads);
   int64_t sum = S2_hard_OpenMP(x, y, z, c, pi, primes, factor, threads, is_print);
@@ -272,7 +296,7 @@ int128_t S2_hard(int128_t x,
   if (y <= FactorTable<uint16_t>::max())
   {
     FactorTable<uint16_t> factor(y, threads);
-    int64_t max_prime = min(y, z / isqrt(y));
+    int64_t max_prime = s2_central_max_prime(x, y, z);
     PiTable pi(max_prime, threads);
     auto primes = pi.get_primes<uint32_t>(max_prime, threads);
     sum = S2_hard_OpenMP(x, y, z, c, pi, primes, factor, threads, is_print);
@@ -280,7 +304,7 @@ int128_t S2_hard(int128_t x,
   else
   {
     FactorTable<uint32_t> factor(y, threads);
-    int64_t max_prime = min(y, z / isqrt(y));
+    int64_t max_prime = s2_central_max_prime(x, y, z);
     PiTable pi(max_prime, threads);
     auto primes = pi.get_primes<int64_t>(max_prime, threads);
     sum = S2_hard_OpenMP(x, y, z, c, pi, primes, factor, threads, is_print);
