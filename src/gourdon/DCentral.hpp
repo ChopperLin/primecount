@@ -31,16 +31,18 @@ struct CentralEvent
   int64_t weight;
 };
 
-/// For p = primes[b] and p^2 <= t < p^3, the signed rough-number
-/// prefix M(t) = sum_{n <= t, P-(n) > p} mu(n) satisfies
-/// M(t) = phi(t, b - 1) - central_correction(t, p, b).
+/// For p = primes[b], y >= p^2 and p^2 <= t < p^3, the signed rough-number
+/// prefix M'(t) = sum_{n <= t, P-(n) > p, P+(n) <= y} mu(n) satisfies
+/// M'(t) = phi(t, b - 1) - central_correction(t, p, b, y, pi).
 ///
 inline int64_t central_correction(int64_t t,
                                   int64_t p,
                                   int64_t b,
+                                  int64_t y,
                                   const PiTable& pi)
 {
-  return 2 * pi[t] + pi[t / p] + pi[isqrt(t)] - 4 * b + 2;
+  int64_t pi_min_y = (t <= y) ? pi[t] : pi[y];
+  return pi[t] + pi_min_y + pi[t / p] + pi[isqrt(t)] - 4 * b + 2;
 }
 
 /// Sum the correction over prime n in (lower, upper]. The last two
@@ -50,6 +52,7 @@ template <typename T, typename Primes>
 T central_prime_sum(T xp,
                     int64_t p,
                     int64_t b,
+                    int64_t y,
                     int64_t lower,
                     int64_t upper,
                     const Primes& primes,
@@ -62,18 +65,36 @@ T central_prime_sum(T xp,
     return 0;
 
   T sum = 0;
+  int64_t split = fast_div64(xp, y + 1);
+  split = in_between(lower, split, upper);
+  int64_t pi_split = pi[split];
+
+  T sum1 = 0;
   int64_t i = begin + 1;
+  for (; i + 3 <= pi_split; i += 4)
+  {
+    int64_t t0 = fast_div64(xp, primes[i]);
+    int64_t t1 = fast_div64(xp, primes[i + 1]);
+    int64_t t2 = fast_div64(xp, primes[i + 2]);
+    int64_t t3 = fast_div64(xp, primes[i + 3]);
+    sum1 += pi[t0] + pi[t1] + pi[t2] + pi[t3];
+  }
+  for (; i <= pi_split; i++)
+    sum1 += pi[fast_div64(xp, primes[i])];
+
+  T sum2 = 0;
   for (; i + 3 <= end; i += 4)
   {
     int64_t t0 = fast_div64(xp, primes[i]);
     int64_t t1 = fast_div64(xp, primes[i + 1]);
     int64_t t2 = fast_div64(xp, primes[i + 2]);
     int64_t t3 = fast_div64(xp, primes[i + 3]);
-    sum += pi[t0] + pi[t1] + pi[t2] + pi[t3];
+    sum2 += pi[t0] + pi[t1] + pi[t2] + pi[t3];
   }
   for (; i <= end; i++)
-    sum += pi[fast_div64(xp, primes[i])];
-  sum *= 2;
+    sum2 += pi[fast_div64(xp, primes[i])];
+
+  sum += sum1 + T(pi_split - begin) * pi[y] + 2 * sum2;
 
   T k = xp / p;
   int64_t r0 = fast_div64(k, upper);
@@ -92,13 +113,14 @@ T central_prime_sum(T xp,
 }
 
 /// Let X = floor(x/p), A = floor(X/U), H = floor(sqrt(X)) and
-/// Phi(t) = phi(t, b - 1), with p^2 <= A <= H < U < p^3 and U <= y.
+/// Phi(t) = phi(t, b - 1), with p^2 <= A <= H < U < p^3 and H <= y.
 /// The contribution from A < m <= U is
-///   M(H) Phi(H) - M(U) Phi(A)
-///   + sum_{A < n <= H} a(n) E(X/n)
-///   - sum_{A < n <= H} (a(n) + c(n)) Phi(X/n),
-/// where a(n) = [P-(n) >= p], c(n) = mu(n)[P-(n) > p], E = Phi - M.
-/// Prime n > p have a(n) + c(n) = 0. The remaining terms have n = q*r,
+///   M'(H) Phi(H) - M'(U) Phi(A)
+///   + sum_{A < n <= H} a(n) E'(X/n)
+///   - sum_{A < n <= H} (a(n) + c'(n)) Phi(X/n),
+/// where a(n) = [P-(n) >= p], c'(n) = mu(n)[P-(n) > p, P+(n) <= y],
+/// and E' = Phi - M'.
+/// Prime n > p have a(n) + c'(n) = 0. The remaining terms have n = q*r,
 /// p <= q <= r, with weight 1 if q = p or q = r, and weight 2 otherwise.
 /// Events are processed in decreasing n so sieve counts increase.
 ///
@@ -106,6 +128,7 @@ template <typename T, typename Primes, typename Count>
 ALWAYS_INLINE T central_events(T xp,
                                int64_t p,
                                int64_t b,
+                               int64_t y,
                                int64_t lower,
                                int64_t middle,
                                int64_t low,
@@ -121,7 +144,7 @@ ALWAYS_INLINE T central_events(T xp,
   if (low <= middle && middle < high)
   {
     int64_t value = phi + count(middle - low);
-    sum += T(value) * (value - central_correction(middle, p, b, pi));
+    sum += T(value) * (value - central_correction(middle, p, b, y, pi));
   }
 
   int64_t lower_n = min(fast_div(xp, high), middle);
@@ -129,7 +152,7 @@ ALWAYS_INLINE T central_events(T xp,
   int64_t upper_n = min(fast_div(xp, max(low, int64_t(1))), middle);
   if (lower_n < upper_n)
   {
-    sum += central_prime_sum(xp, p, b, lower_n, upper_n, primes, pi);
+    sum += central_prime_sum(xp, p, b, y, lower_n, upper_n, primes, pi);
 
     events.clear();
     int64_t last_q = pi[isqrt(upper_n)];
@@ -147,7 +170,7 @@ ALWAYS_INLINE T central_events(T xp,
     {
       int64_t t = fast_div64(xp, event.n);
       int64_t value = phi + count(t - low);
-      sum += central_correction(t, p, b, pi);
+      sum += central_correction(t, p, b, y, pi);
       sum -= T(event.weight) * value;
     }
   }
@@ -155,12 +178,13 @@ ALWAYS_INLINE T central_events(T xp,
 }
 
 template <typename T, typename Primes, typename Count>
-ALWAYS_INLINE T central_y_segment(T xp,
+ALWAYS_INLINE T central_z_segment(T xp,
                                   int64_t p,
                                   int64_t b,
+                                  int64_t y,
                                   int64_t lower,
                                   int64_t middle,
-                                  int64_t mertens_y,
+                                  int64_t mertens_z,
                                   int64_t low,
                                   int64_t high,
                                   int64_t phi,
@@ -174,9 +198,9 @@ ALWAYS_INLINE T central_y_segment(T xp,
   if (low <= lower && lower < high)
   {
     int64_t value = phi + count(lower - low);
-    sum -= T(value) * mertens_y;
+    sum -= T(value) * mertens_z;
   }
-  sum += central_events(xp, p, b, lower, middle, low, high,
+  sum += central_events(xp, p, b, y, lower, middle, low, high,
                         phi, primes, pi, count, events, sorter);
   return sum;
 }
@@ -185,6 +209,7 @@ template <typename T, typename Primes, typename Count>
 ALWAYS_INLINE T central_square_segment(T xp,
                                        int64_t p,
                                        int64_t b,
+                                       int64_t y,
                                        int64_t upper,
                                        int64_t middle,
                                        int64_t z,
@@ -198,13 +223,13 @@ ALWAYS_INLINE T central_square_segment(T xp,
                                        SemiprimeEventBitmap& sorter)
 {
   int64_t square = p * p;
-  T sum = central_events(xp, p, b, square, middle, low, high,
+  T sum = central_events(xp, p, b, y, square, middle, low, high,
                          phi, primes, pi, count, events, sorter);
   if (low <= upper && upper < high)
   {
     int64_t value = phi + count(upper - low);
     int64_t phi_square = pi[square] - b + 3;
-    sum -= T(phi_square) * (value - central_correction(upper, p, b, pi));
+    sum -= T(phi_square) * (value - central_correction(upper, p, b, y, pi));
   }
 
   // The remaining original leaves have a prime second factor <= p^2
@@ -236,34 +261,35 @@ ALWAYS_INLINE bool central_row(T xp,
                                int64_t phi,
                                const Primes& primes,
                                const PiTable& pi,
-                               const Vector<int64_t>& mertens_y,
+                               const Vector<int64_t>& mertens_z,
                                const Count& count,
                                Vector<CentralEvent>& events,
                                SemiprimeEventBitmap& sorter,
                                T& sum,
                                int64_t& max_m)
 {
-  int64_t upper = min(fast_div(xp, p * p), y + 1);
+  int64_t upper = min(fast_div(xp, p * p), z + 1);
 
-  if (upper <= y && upper >= p * p)
+  if (upper <= z && upper >= p * p &&
+      upper < p * p * p && z < p * (p * p + 1))
   {
     int64_t middle = isqrt(xp);
-    if (middle < upper)
+    if (middle < upper && middle <= y)
     {
-      sum += central_square_segment(xp, p, b, upper, middle,
+      sum += central_square_segment(xp, p, b, y, upper, middle,
                                     z, low, high, phi, primes, pi,
                                     count, events, sorter);
       return true;
     }
   }
-  else if (upper > y && z == y && p * p > y / p)
+  else if (upper > z && p * p > z / p)
   {
     int64_t middle = isqrt(xp);
-    if (middle < y)
+    if (middle < z && middle <= y)
     {
-      int64_t lower = fast_div64(xp, y);
-      sum += central_y_segment(xp, p, b, lower, middle,
-                               mertens_y[b], low, high, phi,
+      int64_t lower = fast_div64(xp, z);
+      sum += central_z_segment(xp, p, b, y, lower, middle,
+                               mertens_z[b], low, high, phi,
                                primes, pi, count, events, sorter);
       max_m = min(max_m, lower);
     }

@@ -150,15 +150,11 @@ T D_OpenMP(T x,
 
   int64_t xz = x / z;
   int64_t x_star = get_x_star_gourdon(x, y);
-  Vector<int64_t> mertens_y;
-  if (z == y)
-  {
-    int64_t max_b = pi[min(iroot<3>(x / y), x_star)];
-    // Only rows with prime^2 <= y < prime^3 use this prefix
-    mertens_y = phi_vector(y, max_b, primes, pi);
-    for (int64_t b = 1; b <= max_b; b++)
-      mertens_y[b] -= central_correction(y, primes[b], b, pi);
-  }
+  int64_t max_b = pi[min(iroot<3>(x / z), x_star)];
+  // Only rows with prime^2 <= z < prime^3 use this prefix
+  Vector<int64_t> mertens_z = phi_vector(z, max_b, primes, pi);
+  for (int64_t b = 1; b <= max_b; b++)
+    mertens_z[b] -= central_correction(z, primes[b], b, y, pi);
 
   // These load balancing settings work well on my
   // dual-socket AMD EPYC 7642 server with 192 CPU cores.
@@ -176,7 +172,7 @@ T D_OpenMP(T x,
     while (loadBalancer.get_work(thread))
     {
       thread.start_time = get_time();
-      UT partial = D_thread<UT>(x, x_star, xz, y, z, k, primes, pi, factor, mertens_y, thread);
+      UT partial = D_thread<UT>(x, x_star, xz, y, z, k, primes, pi, factor, mertens_z, thread);
       thread.sum = signed_from_unsigned<T>(partial);
       thread.stop_time = get_time();
       sum += partial;
@@ -209,7 +205,7 @@ int64_t D(int64_t x,
   }
 
   FactorTableD<uint16_t> factor(y, z, threads);
-  PiTable pi(y, threads);
+  PiTable pi(z, threads);
   auto primes = pi.get_primes<uint32_t>(y, threads);
   int64_t sum = D_OpenMP(x, y, z, k, pi, primes, factor, threads, is_print);
 
@@ -245,7 +241,7 @@ int128_t D(int128_t x,
   if (z <= FactorTableD<uint16_t>::max())
   {
     FactorTableD<uint16_t> factor(y, z, threads);
-    PiTable pi(y, threads);
+    PiTable pi(z, threads);
 
     if (y <= UINT32_MAX)
     {
@@ -261,7 +257,7 @@ int128_t D(int128_t x,
   else
   {
     FactorTableD<uint32_t> factor(y, z, threads);
-    PiTable pi(y, threads);
+    PiTable pi(z, threads);
     auto primes = pi.get_primes<int64_t>(y, threads);
     sum = D_OpenMP(x, y, z, k, pi, primes, factor, threads, is_print);
   }

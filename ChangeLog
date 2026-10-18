@@ -1,5 +1,6 @@
-Changes in primecount-8.9, 2026-10-13
+Changes in primecount-8.9, 2026-10-18
 
+* D: Generalize central-region cancellation to z >= y and test its boundaries.
 * DCentral.hpp: Cancel prime hard leaves in the central regions of D.
 * D: Skip factor table scans when the remaining factors must be prime.
 * CMake: Prefix internal cache variables with PRIMECOUNT_ to avoid name collisions.

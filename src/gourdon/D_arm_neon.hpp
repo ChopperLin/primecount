@@ -110,7 +110,7 @@ T D_thread_arm_neon(T x,
                     const Primes& primes,
                     const PiTable& pi,
                     const FactorTable& factor,
-                    const Vector<int64_t>& mertens_y,
+                    const Vector<int64_t>& mertens_z,
                     ThreadData& thread)
 {
   T sum = 0;
@@ -171,7 +171,7 @@ T D_thread_arm_neon(T x,
         goto next_segment;
 
       if (central_row(xp, prime, b, y, z, low, high, phi[b], primes, pi,
-                      mertens_y, count_sieve, events, sorter, sum, max_m))
+                      mertens_z, count_sieve, events, sorter, sum, max_m))
       {
         phi[b] += sieve.get_total_count();
         sieve.cross_off_count(prime, b);

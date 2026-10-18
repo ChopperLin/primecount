@@ -179,10 +179,10 @@ int main()
     int region;
   };
 
-  // Regions: 0 = fallback, 1 = natural upper bound, 2 = upper bound y.
+  // Regions: 0 = fallback, 1 = natural upper bound, 2 = upper bound z.
   // Include A = p^2, A = H, prime/semiprime endpoints, and boundaries
   // immediately below, at, and above multiples of the sieve alignment.
-  const Array<CentralParams, 33> central_cases = {{
+  const Array<CentralParams, 37> central_cases = {{
     { 279840, 530, 530, 23, 0 },
     { 279841, 530, 530, 23, 0 },
     { 280370, 530, 530, 23, 1 },
@@ -195,7 +195,11 @@ int main()
     { 560739, 1058, 1058, 23, 2 },
     { 560740, 1058, 1058, 23, 2 },
     { 280370, 600, 700, 23, 1 },
-    { 665499, 1058, 2116, 23, 0 },
+    { 665499, 1058, 2116, 23, 1 },
+    { 345000, 590, 640, 23, 2 },
+    { 501264, 708, 900, 23, 2 },
+    { 502680, 708, 900, 23, 2 },
+    { 502681, 708, 900, 23, 0 },
     { 7653060, 12167, 12167, 23, 0 },
     { 292140, 541, 541, 23, 2 },
     { 807302, 899, 899, 23, 2 },
@@ -215,7 +219,7 @@ int main()
     { 921601, 1200, 1200, 23, 2 },
     { 1414562, 1682, 1682, 29, 1 },
     { 1416243, 1682, 1682, 29, 2 },
-    { 1582779, 1682, 3364, 29, 0 }
+    { 1582779, 1682, 3364, 29, 1 }
   }};
 
   for (const CentralParams& params : central_cases)
@@ -223,15 +227,14 @@ int main()
     int64_t p = params.prime;
     int64_t x = params.xp * p;
     int64_t upper = params.xp / (p * p);
-    int64_t lower = params.xp / params.y;
     int64_t middle = isqrt(params.xp);
     int region = 0;
 
-    if (p * p <= upper && middle < upper && upper <= params.y)
+    if (upper <= params.z && p * p <= upper && upper < p * p * p && params.z < p * (p * p + 1) &&
+        middle < upper && middle <= params.y)
       region = 1;
-    else if (params.z == params.y &&
-             p * p <= lower && lower <= middle &&
-             middle < params.y && params.y < p * p * p)
+    else if (upper > params.z && p * p > params.z / p &&
+             middle < params.z && middle <= params.y)
       region = 2;
 
     std::cout << "D central region " << params.region << " ("
